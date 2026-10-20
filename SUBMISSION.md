@@ -16,6 +16,7 @@ The description is under 1,000 characters including spaces.
 - Local CLI: repository-local `genlayer@0.39.1`; global CLI used: **NO**
 - Primary deployment tx: `0xd88c8629a19c6189f9d9ece08f292c3bcb818ccaeef77e68ad4a7b003dab8674`
 - Consumer deployment tx: `0x1ee27aeb7f648967b63c995ef6672e3dc3e86485acd4af9b3469b1952023c9ca`
+- GitHub Actions: [final CI run](https://github.com/ometere123/courselock/actions/runs/39418271586) — success for commit `edd6651cc418a01ee60df9ed175c9fe012133220`
 
 ## GenLayer-native mechanism
 
@@ -37,4 +38,4 @@ The public evidence is a real immutable GitHub README commit, but it does not pr
 
 ## Readiness
 
-The code and live stable-network evidence are reviewer-ready. Final submission readiness additionally depends on the final GitHub Actions run for the release commit; no claim of green CI is made until that run is read back.
+The code, live stable-network evidence and final GitHub Actions run are reviewer-ready. Submission readiness is `READY FOR REVIEW` for commit `edd6651cc418a01ee60df9ed175c9fe012133220`; the reviewer-facing score targets remain provisional and are not guarantees.

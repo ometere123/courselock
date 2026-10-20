@@ -15,6 +15,7 @@ The repository distinguishes the deterministic offline fake runtime, GenVM Direc
 | GenVM linter | `genvm-linter==0.11.0`, `GENVM_VERSION=v0.3.0-rc7 genvm-lint check ... --json` → primary and consumer validation pass; only informational `I200` |
 | Stable network guard | `node scripts/assert_studionet.mjs` → `eth_chainId=0xf22f`, decimal `61999` |
 | Local CLI | repository-local `genlayer --version` → `0.39.1` |
+| Dependency audit | `npm audit --omit=dev` → zero findings; full tree → two moderate nested `dockerode`/`uuid` development-tool findings, zero high/critical |
 
 The Direct Mode suite contains 26 meaningful tests rather than 60 duplicated functions. It covers typed/nonzero address conversion, course ownership/acceptance, duplicate and unauthorized calls, stale hashes, withdrawal/closure history, URL namespace hardening, evidence shape/quote failures, proof and position fail-closed behavior, malicious-result cases, consumer hash/executor/replay checks, and the status dictionary. Direct Mode uses the local test harness; it is not a StudioNet transaction.
 

@@ -13,6 +13,12 @@
     "preflight": "python scripts/preflight.py"
   },
   "devDependencies": {
-    "genlayer": "0.39.1"
+    "genlayer": "0.39.1",
+    "esbuild": "0.28.2"
+  },
+  "overrides": {
+    "genlayer": {
+      "vitest": "4.1.11"
+    }
   }
 }

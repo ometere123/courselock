@@ -38,4 +38,4 @@ The public evidence is a real immutable GitHub README commit, but it does not pr
 
 ## Readiness
 
-READY FOR REVIEW. No unresolved critical or high-severity CourseLock contract defect remains; npm installation reported dev-tooling advisories that were not auto-fixed because the CLI version is locked.
+READY FOR REVIEW. No unresolved critical or high-severity CourseLock contract defect or dependency finding remains; the pinned CLI tree retains two moderate nested `dockerode`/`uuid` development-tool advisories, with zero production, high, or critical findings.

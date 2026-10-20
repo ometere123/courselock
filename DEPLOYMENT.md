@@ -9,6 +9,7 @@ This file records the completed stable-network run. Values below are from Studio
 - RPC: `https://studio.genlayer.com/api`
 - Repository-local CLI: `genlayer@0.39.1`
 - Global CLI used: **NO**
+- npm audit after lockfile hardening: 2 moderate development-tool advisories (`dockerode`/nested `uuid`); zero production, high, or critical findings
 - GenVM linter: `genvm-linter==0.11.0`, primary and consumer validation passed
 - Pinned contract runner: `py-genlayer:1jb45aa8ynh2a9c9xn3b7qqh8sm5q93hwfp7jqmwsfhh8jpz09h6`
 - RPC guard: `node scripts/assert_studionet.mjs` confirmed `eth_chainId = 0xf22f`

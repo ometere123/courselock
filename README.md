@@ -84,7 +84,7 @@ python -m pytest tests -q
 python scripts/preflight.py
 ```
 
-For stable-network work, install dependencies with `npm ci` when the lockfile is present, verify `0.39.1` with the repository-local executable, run `node scripts/assert_studionet.mjs`, and use `npm run deploy:guarded`. On Windows the exact binary is `.\node_modules\.bin\genlayer.cmd`; never invoke the globally installed `0.40.0rc2`.
+For stable-network work, install dependencies with `npm ci` when the lockfile is present, verify `0.39.1` with the repository-local executable, run `node scripts/assert_studionet.mjs`, and use `npm run deploy:guarded`. On Windows the exact binary is `.\node_modules\.bin\genlayer.cmd`; never invoke the globally installed `0.40.0rc2`. The lockfile also pins `esbuild@0.28.2` and overrides GenLayer's Vitest branch to `4.1.11` for CLI compatibility and removal of critical development-tool advisories; the remaining audit findings are two moderate nested `dockerode`/`uuid` advisories, with zero production, high, or critical findings.
 
 See [DEPLOYMENT.md](DEPLOYMENT.md) for actual transaction evidence, [docs/CONSENSUS.md](docs/CONSENSUS.md) for execution paths, [docs/THREAT_MODEL.md](docs/THREAT_MODEL.md) for residual risks, [docs/INTEGRATION.md](docs/INTEGRATION.md) for the consumer contract, [docs/TEST_PLAN.md](docs/TEST_PLAN.md) for coverage, and [SUBMISSION.md](SUBMISSION.md) for reviewer-facing material.
 

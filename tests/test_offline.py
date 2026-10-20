@@ -17,9 +17,14 @@ def proof(st=1,reason='DELIVERY_CONFIRMED'):
 def rel(relation=2,same=True,reverses=True,reason='DEADLINE_REVERSED',witness='Friday promised but Wednesday imposed'):
     return {'relation':relation,'same_action':same,'reverses_treatment':reverses,'reason':reason,'witness':witness}
 
+def position_result(value):
+    return dict(value, retryable=False)
+
 def mock_llm(rt,p=1,r=2):
     def run(prompt):
         if '/ SOURCE-BACKED ACTION CHECK' in prompt:return proof(p)
+        if 'ADVERSARIAL CLEARANCE AUDIT' in prompt:
+            return {'counterexample':False,'ambiguous':False}
         if '/ CONTRADICTORY ENFORCEMENT' in prompt:
             return rel(r,True,r==2,witness='deadline shifted' if r==2 else '')
         if 'ADVERSARIAL CONTRADICTION AUDIT' in prompt:
@@ -92,7 +97,7 @@ def test_unrelated_and_ambiguous_fail_closed(harness,relation,same,reverses):
     *_,aid=setup(rt)
     rt.llm=lambda p: rel(relation,same,reverses,witness='' if relation!=2 else 'x')
     c.assess_position(aid)
-    assert c.get_attempt(aid)['status']==3
+    assert c.get_attempt(aid)['status'] in (3, 4)
 
 
 def test_party_must_accept(harness):
@@ -162,10 +167,79 @@ def test_proof_failure_not_confirmed(harness):
     rid=c.commit_reliance(rep,ACTION,'because',c.get_representation(rep)['hash'])
     mock_llm(rt)
     c.prove_action(rid,SOURCE,EVIDENCE)
-    assert c.get_reliance(rid)['proof_status']==3
+    assert c.get_reliance(rid)['proof_status']==4
     rt.sender='0xA';r=c.get_reliance(rid)
     with pytest.raises(Exception,match='NO_CONFIRMED_ACTION'):
         c.open_position(rid,DENY,r['commitment_hash'],r['evidence_hash'])
+
+
+def test_transient_proof_failure_is_retryable_and_recovers_without_rebinding(harness):
+    rt=harness;c=rt.contract
+    course=c.open_course('0xB',SCOPE,PREFIX)
+    rt.sender='0xB';c.accept_course(course)
+    rt.sender='0xA';rep=c.publish_representation(course,PROMISE)
+    rt.sender='0xB';rid=c.commit_reliance(rep,ACTION,'because',c.get_representation(rep)['hash'])
+    mock_llm(rt)
+    c.prove_action(rid,SOURCE,EVIDENCE)
+    first=c.get_reliance(rid)
+    assert first['proof_status']==4
+    assert first['proof_attempts']==1
+    assert len(first['proof_history'])==1
+    rt.pages[SOURCE]='Case 41 public receipt: '+EVIDENCE
+    mock_llm(rt)
+    c.prove_action(rid,SOURCE,EVIDENCE)
+    second=c.get_reliance(rid)
+    assert second['proof_status']==1
+    assert second['proof_attempts']==2
+    assert len(second['proof_history'])==2
+    assert second['commitment_hash']==first['commitment_hash']
+
+
+def test_retry_cannot_substitute_evidence_or_actor(harness):
+    rt=harness;c=rt.contract
+    course=c.open_course('0xB',SCOPE,PREFIX)
+    rt.sender='0xB';c.accept_course(course)
+    rt.sender='0xA';rep=c.publish_representation(course,PROMISE)
+    rt.sender='0xB';rid=c.commit_reliance(rep,ACTION,'because',c.get_representation(rep)['hash'])
+    mock_llm(rt)
+    c.prove_action(rid,SOURCE,EVIDENCE)
+    rt.sender='0xA'
+    with pytest.raises(Exception,match='ONLY_RELYING_PARTY'):
+        c.prove_action(rid,SOURCE,EVIDENCE)
+    rt.sender='0xB'
+    with pytest.raises(Exception,match='EVIDENCE_BINDING_IMMUTABLE'):
+        c.prove_action(rid,SOURCE,'substituted quote')
+
+
+def test_retry_limit_exhausts_without_clearance(harness):
+    rt=harness;c=rt.contract
+    course=c.open_course('0xB',SCOPE,PREFIX)
+    rt.sender='0xB';c.accept_course(course)
+    rt.sender='0xA';rep=c.publish_representation(course,PROMISE)
+    rt.sender='0xB';rid=c.commit_reliance(rep,ACTION,'because',c.get_representation(rep)['hash'])
+    mock_llm(rt)
+    for _ in range(3):
+        c.prove_action(rid,SOURCE,EVIDENCE)
+    record=c.get_reliance(rid)
+    assert record['proof_status']==5
+    assert record['proof_attempts']==3
+    assert len(record['proof_history'])==3
+    with pytest.raises(Exception,match='PROOF_ALREADY_ATTEMPTED'):
+        c.prove_action(rid,SOURCE,EVIDENCE)
+
+
+def test_semantic_inconclusive_proof_remains_terminal(harness):
+    rt=harness;c=rt.contract
+    course=c.open_course('0xB',SCOPE,PREFIX)
+    rt.sender='0xB';c.accept_course(course)
+    rt.sender='0xA';rep=c.publish_representation(course,PROMISE)
+    rt.sender='0xB';rid=c.commit_reliance(rep,ACTION,'because',c.get_representation(rep)['hash'])
+    rt.pages[SOURCE]='Case 41 public receipt: '+EVIDENCE
+    mock_llm(rt,p=3)
+    c.prove_action(rid,SOURCE,EVIDENCE)
+    assert c.get_reliance(rid)['proof_status']==3
+    with pytest.raises(Exception,match='PROOF_ALREADY_ATTEMPTED'):
+        c.prove_action(rid,SOURCE,EVIDENCE)
 
 
 def test_proof_quote_absent_rejected(harness):
@@ -229,6 +303,14 @@ def test_proof_validator_accepts_matching_independent_read(harness):
     assert rt.validation(rt.module.gl.vm.Return(proof(1))) is True
 
 
+def test_proof_validator_rejects_leader_confirmation_when_source_is_unavailable(harness):
+    rt=harness;c=rt.contract
+    setup(rt)
+    rt.pages.pop(SOURCE)
+    rt.llm=lambda prompt: proof(1)
+    assert rt.validation(rt.module.gl.vm.Return(proof(1))) is False
+
+
 def test_position_leader_validator_disagreement(harness):
     rt=harness;c=rt.contract
     *_,aid=setup(rt)
@@ -249,12 +331,70 @@ def test_position_validator_adversarial_veto(harness):
     assert rt.validation(rt.module.gl.vm.Return(rel(2))) is False
 
 
+def test_position_validator_positive_clearance_audit_veto(harness):
+    rt=harness;c=rt.contract
+    *_,aid=setup(rt)
+    c.assess_position(aid)
+    def recheck(prompt):
+        if 'ADVERSARIAL CLEARANCE AUDIT' in prompt:
+            return {'counterexample':True,'ambiguous':False}
+        return rel(1,same=True,reverses=False,witness='')
+    rt.llm=recheck
+    assert rt.validation(rt.module.gl.vm.Return(position_result(rel(1,same=True,reverses=False,witness='')))) is False
+
+
+def test_position_validator_positive_clearance_audit_accepts_only_clean_result(harness):
+    rt=harness;c=rt.contract
+    *_,aid=setup(rt)
+    c.assess_position(aid)
+    def recheck(prompt):
+        if 'ADVERSARIAL CLEARANCE AUDIT' in prompt:
+            return {'counterexample':False,'ambiguous':False}
+        return rel(1,same=True,reverses=False,witness='')
+    rt.llm=recheck
+    assert rt.validation(rt.module.gl.vm.Return(position_result(rel(1,same=True,reverses=False,witness='')))) is True
+
+
+def test_third_party_cannot_grief_open_assessment_and_party_can_recover(harness):
+    rt=harness;c=rt.contract
+    *_,aid=setup(rt)
+    rt.sender='0xC'
+    with pytest.raises(Exception,match='NOT_PARTY'):
+        c.assess_position(aid)
+    rt.sender='0xA'
+    def unavailable(prompt):
+        raise IOError('temporary provider failure')
+    rt.llm=unavailable
+    c.assess_position(aid)
+    assert c.get_attempt(aid)['status']==4
+    mock_llm(rt,r=1)
+    c.assess_position(aid)
+    assert c.get_attempt(aid)['status']==1
+
+
+def test_assessment_retry_limit_is_bounded_and_not_clearance(harness):
+    rt=harness;c=rt.contract
+    *_,aid=setup(rt)
+    def unavailable(prompt):
+        raise IOError('temporary provider failure')
+    rt.llm=unavailable
+    for _ in range(3):
+        c.assess_position(aid)
+    attempt=c.get_attempt(aid)
+    assert attempt['status']==3
+    assert attempt['reason']=='ASSESSMENT_RETRY_LIMIT_EXHAUSTED'
+    assert attempt['assessment_attempts']==3
+    assert len(attempt['assessment_history'])==3
+    with pytest.raises(Exception,match='ATTEMPT_ALREADY_ASSESSED'):
+        c.assess_position(aid)
+
+
 def test_position_validator_adversarial_pass(harness):
     rt=harness;c=rt.contract
     *_,aid=setup(rt)
     c.assess_position(aid)
     mock_llm(rt)
-    assert rt.validation(rt.module.gl.vm.Return(rel(2))) is True
+    assert rt.validation(rt.module.gl.vm.Return(position_result(rel(2)))) is True
 
 
 def test_inject_wrong_schema_rejected(harness):

@@ -41,6 +41,17 @@ def relation(relation_code=2, same=True, reverses=True):
     })
 
 
+def position_result(relation_code=2, same=True, reverses=True):
+    return {
+        'relation': relation_code,
+        'same_action': same,
+        'reverses_treatment': reverses,
+        'reason': 'DEADLINE_CONFLICT' if relation_code == 2 else 'SAFE_NON_CONTRADICTION',
+        'witness': 'Friday promised; Wednesday imposed' if relation_code == 2 else '',
+        'retryable': False,
+    }
+
+
 def mock_web(direct_vm, page=PAGE):
     direct_vm.mock_web(
         r'.*example\.org/receipts/item-41.*',
@@ -51,6 +62,7 @@ def mock_web(direct_vm, page=PAGE):
 def mock_proof(direct_vm, status=1, page=PAGE):
     mock_web(direct_vm, page)
     direct_vm.mock_llm(r'COURSELOCK / LEADER SOURCE CHECK', proof(status))
+    direct_vm.mock_llm(r'COURSELOCK / INDEPENDENT SOURCE CHECK', proof(status))
 
 
 def mock_position(direct_vm, relation_code=2, same=True, reverses=True):
@@ -246,7 +258,7 @@ def test_missing_quote_unreachable_and_oversized_pages_never_confirm(
     )
     mock_proof(direct_vm, page='x' * 13001)
     contract.prove_action(reliance2, SOURCE, QUOTE)
-    assert contract.get_reliance(reliance2)['proof_status'] == 3
+    assert contract.get_reliance(reliance2)['proof_status'] == 4
 
 
 def test_malformed_proof_response_fails_closed(direct_vm, direct_deploy, direct_bob):
@@ -256,7 +268,66 @@ def test_malformed_proof_response_fails_closed(direct_vm, direct_deploy, direct_
     mock_web(direct_vm)
     direct_vm.mock_llm(r'COURSELOCK / LEADER SOURCE CHECK', json.dumps({'status': 1}))
     contract.prove_action(reliance_id, SOURCE, QUOTE)
-    assert contract.get_reliance(reliance_id)['proof_status'] == 3
+    assert contract.get_reliance(reliance_id)['proof_status'] == 4
+
+
+def test_native_validator_rejects_malicious_leader_confirmation(
+    direct_vm, direct_deploy, direct_bob
+):
+    contract, _, _, reliance_id, _, _ = create_reliance(
+        direct_vm, direct_deploy, direct_bob
+    )
+    mock_proof(direct_vm)
+    contract.prove_action(reliance_id, SOURCE, QUOTE)
+    direct_vm.clear_mocks()
+    mock_web(direct_vm)
+    direct_vm.mock_llm(r'COURSELOCK / INDEPENDENT SOURCE CHECK', proof(2, 'NOT_SUPPORTED'))
+    assert direct_vm.run_validator(leader_result=json.loads(proof(1))) is False
+
+
+def test_native_validator_re_fetches_and_accepts_matching_evidence(
+    direct_vm, direct_deploy, direct_bob
+):
+    contract, _, _, reliance_id, _, _ = create_reliance(
+        direct_vm, direct_deploy, direct_bob
+    )
+    mock_proof(direct_vm)
+    contract.prove_action(reliance_id, SOURCE, QUOTE)
+    direct_vm.clear_mocks()
+    mock_web(direct_vm)
+    direct_vm.mock_llm(r'COURSELOCK / INDEPENDENT SOURCE CHECK', proof(1))
+    assert direct_vm.run_validator(leader_result=json.loads(proof(1))) is True
+
+
+def test_native_validator_rejects_malformed_and_extra_leader_results(
+    direct_vm, direct_deploy, direct_bob
+):
+    contract, _, _, reliance_id, _, _ = create_reliance(
+        direct_vm, direct_deploy, direct_bob
+    )
+    mock_proof(direct_vm)
+    contract.prove_action(reliance_id, SOURCE, QUOTE)
+    assert direct_vm.run_validator(leader_result={'status': 1}) is False
+    assert direct_vm.run_validator(
+        leader_result={'status': 1, 'reason': 'OK', 'extra': 'not allowed'}
+    ) is False
+
+
+def test_transient_proof_failure_recovers_with_same_frozen_evidence(
+    direct_vm, direct_deploy, direct_bob
+):
+    contract, _, _, reliance_id, _, _ = create_reliance(
+        direct_vm, direct_deploy, direct_bob
+    )
+    # No web mock means the leader sees a temporary provider failure.
+    contract.prove_action(reliance_id, SOURCE, QUOTE)
+    assert contract.get_reliance(reliance_id)['proof_status'] == 4
+    mock_proof(direct_vm)
+    contract.prove_action(reliance_id, SOURCE, QUOTE)
+    record = contract.get_reliance(reliance_id)
+    assert record['proof_status'] == 1
+    assert record['proof_attempts'] == 2
+    assert len(record['proof_history']) == 2
 
 
 def test_confirmed_reliance_is_required_before_position(
@@ -317,6 +388,98 @@ def test_consistent_position_clears_only_exact_binding(
     assert not contract.can_enforce(attempt_id, reliance['representation_hash'], reliance['commitment_hash'], '0' * 64)
 
 
+def test_native_validator_rejects_false_contradiction_claim(
+    direct_vm, direct_deploy, direct_bob
+):
+    contract, _, _, reliance_id, reliance, _ = create_confirmed_reliance(
+        direct_vm, direct_deploy, direct_bob
+    )
+    attempt_id = contract.open_position(
+        reliance_id, DENY, reliance['commitment_hash'], reliance['evidence_hash']
+    )
+    mock_position(direct_vm, relation_code=2, same=True, reverses=True)
+    contract.assess_position(attempt_id)
+    direct_vm.clear_mocks()
+    direct_vm.mock_llm(
+        r'COURSELOCK / INDEPENDENT POSITION CHECK',
+        relation(1, same=True, reverses=False),
+    )
+    assert direct_vm.run_validator(
+        leader_result=position_result(2, same=True, reverses=True)
+    ) is False
+
+
+def test_native_validator_positive_clearance_audit_vetoes_false_consistency(
+    direct_vm, direct_deploy, direct_bob
+):
+    contract, _, _, reliance_id, reliance, _ = create_confirmed_reliance(
+        direct_vm, direct_deploy, direct_bob
+    )
+    attempt_id = contract.open_position(
+        reliance_id, ALLOW, reliance['commitment_hash'], reliance['evidence_hash']
+    )
+    mock_position(direct_vm, relation_code=1, same=True, reverses=False)
+    contract.assess_position(attempt_id)
+    direct_vm.clear_mocks()
+    direct_vm.mock_llm(
+        r'COURSELOCK / INDEPENDENT POSITION CHECK',
+        relation(1, same=True, reverses=False),
+    )
+    direct_vm.mock_llm(
+        r'COURSELOCK / ADVERSARIAL CLEARANCE AUDIT',
+        json.dumps({'counterexample': True, 'ambiguous': False}),
+    )
+    assert direct_vm.run_validator(
+        leader_result=position_result(1, same=True, reverses=False)
+    ) is False
+
+
+def test_native_validator_accepts_clean_consistency_audit(
+    direct_vm, direct_deploy, direct_bob
+):
+    contract, _, _, reliance_id, reliance, _ = create_confirmed_reliance(
+        direct_vm, direct_deploy, direct_bob
+    )
+    attempt_id = contract.open_position(
+        reliance_id, ALLOW, reliance['commitment_hash'], reliance['evidence_hash']
+    )
+    mock_position(direct_vm, relation_code=1, same=True, reverses=False)
+    contract.assess_position(attempt_id)
+    direct_vm.clear_mocks()
+    direct_vm.mock_llm(
+        r'COURSELOCK / INDEPENDENT POSITION CHECK',
+        relation(1, same=True, reverses=False),
+    )
+    direct_vm.mock_llm(
+        r'COURSELOCK / ADVERSARIAL CLEARANCE AUDIT',
+        json.dumps({'counterexample': False, 'ambiguous': False}),
+    )
+    assert direct_vm.run_validator(
+        leader_result=position_result(1, same=True, reverses=False)
+    ) is True
+
+
+def test_third_party_cannot_settle_position_during_provider_failure(
+    direct_vm, direct_deploy, direct_bob, direct_charlie
+):
+    contract, _, _, reliance_id, reliance, promisor = create_confirmed_reliance(
+        direct_vm, direct_deploy, direct_bob
+    )
+    attempt_id = contract.open_position(
+        reliance_id, ALLOW, reliance['commitment_hash'], reliance['evidence_hash']
+    )
+    with direct_vm.prank(direct_charlie):
+        with direct_vm.expect_revert('NOT_PARTY'):
+            contract.assess_position(attempt_id)
+    direct_vm.sender = promisor
+    # With no position mock, the promisor receives a bounded retryable state.
+    contract.assess_position(attempt_id)
+    assert contract.get_attempt(attempt_id)['status'] == 4
+    mock_position(direct_vm, relation_code=1, same=True, reverses=False)
+    contract.assess_position(attempt_id)
+    assert contract.get_attempt(attempt_id)['status'] == 1
+
+
 @pytest.mark.parametrize('relation_code,same,reverses', [
     (3, False, False),
     (4, False, False),
@@ -334,7 +497,7 @@ def test_unrelated_ambiguous_or_incomplete_relation_never_clears(
     )
     mock_position(direct_vm, relation_code, same, reverses)
     contract.assess_position(attempt_id)
-    assert contract.get_attempt(attempt_id)['status'] == 3
+    assert contract.get_attempt(attempt_id)['status'] in (3, 4)
     assert not contract.can_enforce(
         attempt_id, reliance['representation_hash'], reliance['commitment_hash'],
         contract.get_attempt(attempt_id)['position_hash'],
@@ -361,9 +524,11 @@ def test_consumer_typed_constructor_hash_validation_and_executor_gate(
     assert consumer.get_count() == 0
     with direct_vm.prank(direct_charlie):
         with direct_vm.expect_revert('ONLY_EXECUTOR'):
-            consumer.execute(1, '0' * 64, '0' * 64, '0' * 64, 'b' * 64)
+            consumer.execute(1, '0' * 64, '0' * 64, '0' * 64,
+                            'payload', '0' * 64, 'b' * 64)
     with direct_vm.expect_revert('BAD_REPRESENTATION_HASH'):
-        consumer.execute(1, 'z' * 64, '0' * 64, '0' * 64, 'a' * 64)
+        consumer.execute(1, 'z' * 64, '0' * 64, '0' * 64,
+                        'payload', '0' * 64, 'a' * 64)
 
 
 def test_status_dictionary_is_stable(direct_vm, direct_deploy, direct_bob):

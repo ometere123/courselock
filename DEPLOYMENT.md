@@ -1,6 +1,6 @@
 # CourseLock deployment evidence
 
-This file records the completed stable-network run. Values below are from StudioNet RPC receipts and readbacks, not placeholders.
+This file records the hardened stable-network deployment and the finalized transaction/readback evidence captured from StudioNet RPC. A finalized negative transaction is still a valid finalized transaction: its contract execution result is an error/rollback and its state mutation is absent.
 
 ## Locked environment
 
@@ -9,52 +9,50 @@ This file records the completed stable-network run. Values below are from Studio
 - RPC: `https://studio.genlayer.com/api`
 - Repository-local CLI: `genlayer@0.39.1`
 - Global CLI used: **NO**
-- npm audit after lockfile hardening: 2 moderate development-tool advisories (`dockerode`/nested `uuid`); zero production, high, or critical findings
-- GenVM linter: `genvm-linter==0.11.0`, primary and consumer validation passed
+- GenVM linter: `genvm-linter==0.11.0`
+- Direct Mode: `genlayer-test==0.29.0`
 - Pinned contract runner: `py-genlayer:1jb45aa8ynh2a9c9xn3b7qqh8sm5q93hwfp7jqmwsfhh8jpz09h6`
 - RPC guard: `node scripts/assert_studionet.mjs` confirmed `eth_chainId = 0xf22f`
 
-The repository-local deployment guard checked the package pin, ran the RPC guard, selected `studionet`, displayed the CLI network readback, and required the literal confirmation `DEPLOY-61999`. Deployment was not performed with a CLI `--rpc` override; the local CLI’s built-in `studionet` configuration was used after the RPC assertion.
+The guarded primary command was run only after the local CLI version and RPC chain ID checks passed. The typed deployment confirmation was `DEPLOY-61999`. No private key was printed, hardcoded or committed.
 
-## Primary deployment
+## Hardened contract deployment
+
+### CourseLock
 
 - Source: `contracts/courselock.py`
-- Signer: `0x0d5540e0aD4B92Aa0ad4e5F1b8cD645ee1E363E7`
-- Address: `0xc0c6016b1Ef9Dc9D4bEC33D651Eb5F6Eb91B8167`
-- Deployment transaction: `0x3654a638f09b9b1909c7e6b75f40cd9af8c88b7c2ffb30a0760a541938c5cfd3`
+- Signer: `0xA7EeAE0E93793e3146Cb14b0700251B8b0EBADFB`
+- Address: `0x7A91ce49b3755BAB0bE608FB0aB17F8F90039C9E`
+- Deployment transaction: `0xd88c8629a19c6189f9d9ece08f292c3bcb818ccaeef77e68ad4a7b003dab8674`
 - Final chain status: `FINALIZED`
 - Consensus result: `MAJORITY_AGREE`
-- Explorer base: [GenLayer Explorer](https://genlayer-explorer.vercel.app)
+- Local SHA-256: `afd51b388aafd35c97f8aaee6a4edaf4a9667bd5f2394a6b7fab46c479fcfea8`
+- Chain-returned SHA-256: `afd51b388aafd35c97f8aaee6a4edaf4a9667bd5f2394a6b7fab46c479fcfea8`
+- Exact source bytes: **yes**
 
-The final receipt was read back after submission with the local GenLayer client and returned status code `7` / `FINALIZED`, result code `6` / `MAJORITY_AGREE`. The chain-exposed source was retrieved through `gen_getContractCode` and compared byte-for-byte.
-
-## Consumer deployment
-
-The consumer was deployed through the repository-local `.\node_modules\.bin\genlayer.cmd` using a typed `addr#...` constructor argument for the finalized primary address.
+### CourseConsumer
 
 - Source: `contracts/course_consumer.py`
-- Constructor CourseLock address: `0xc0c6016b1Ef9Dc9D4bEC33D651Eb5F6Eb91B8167`
+- Constructor CourseLock address: `0x7A91ce49b3755BAB0bE608FB0aB17F8F90039C9E`
 - Signer/executor: `0x0d5540e0aD4B92Aa0ad4e5F1b8cD645ee1E363E7`
-- Address: `0xaa8a5Cd74f6A0f82A4413AF0a8ce71Bb09DcbF90`
-- Deployment transaction: `0xbd2d2472b8238ee7d7aee0b6e2326790a684db1aae9afe65c95d1366af97ede6`
+- Address: `0x6381F1703BFBc80ff151EB2EC3Be585aB5e3aE5C`
+- Deployment transaction: `0x1ee27aeb7f648967b63c995ef6672e3dc3e86485acd4af9b3469b1952023c9ca`
 - Final chain status: `FINALIZED`
 - Consensus result: `MAJORITY_AGREE`
-- Explorer base: [GenLayer Explorer](https://genlayer-explorer.vercel.app)
+- Local SHA-256: `57ac638294a4661340304099848bba6c7ee1fbca9142c038ffc52683d8228cd6`
+- Chain-returned SHA-256: `57ac638294a4661340304099848bba6c7ee1fbca9142c038ffc52683d8228cd6`
+- Exact source bytes: **yes**
+- `get_executor()` readback: `0x0d5540e0ad4b92aa0ad4e5f1b8cd645ee1e363e7`
 
-The deployed consumer’s `get_executor()` readback was `0x0d5540e0ad4b92aa0ad4e5f1b8cd645ee1e363e7` (case-normalized by the view client).
+Explorer base: [GenLayer Explorer](https://genlayer-explorer.vercel.app). The platform’s public base was verified; no unverified deep-link format is invented here.
 
-## Source integrity
+## Source integrity method
 
-| Source | Local SHA-256 | Deployed SHA-256 | Exact bytes |
-|---|---|---|---|
-| `contracts/courselock.py` | `c5d06e1de41d0fc7a0982575f66fe293151b8afd90078550e2da9cfe0b1b537a` | `c5d06e1de41d0fc7a0982575f66fe293151b8afd90078550e2da9cfe0b1b537a` | yes |
-| `contracts/course_consumer.py` | `62ffdf651e1e5bd6b0808776e6c0afab3cc4c23424877e56a646988d5e428257` | `62ffdf651e1e5bd6b0808776e6c0afab3cc4c23424877e56a646988d5e428257` | yes |
+The final local files were read as UTF-8 bytes and hashed with SHA-256. The deployed source was retrieved with StudioNet `gen_getContractCode`, decoded from the RPC’s base64 response, and hashed with the same algorithm. Both hashes above match exactly. The final commit must retain these contract bytes; documentation-only changes do not alter deployed source.
 
-Method: read each deployed source with the StudioNet `gen_getContractCode` RPC through the repository-local GenLayer JS dependency, hash the UTF-8 response with SHA-256, and compare against the working-tree files. The final Git commit must be checked against these same files before release; later documentation-only commits do not change the deployed contract bytes.
+## Public evidence namespace
 
-## Live evidence namespace
-
-The demonstration froze this immutable public namespace:
+The demonstration froze this mutually accepted namespace:
 
 `https://raw.githubusercontent.com/ometere123/courselock/198b6089f1a10db196d76289aea58e12824ab74a/`
 
@@ -66,69 +64,63 @@ Exact quote independently retrieved and consensus-accepted:
 
 > CourseLock makes a previously authenticated representation and a counterparty's *pre-action* commitment part of the required enforcement history.
 
-This is a bounded public-content demonstration. The page proves that the quoted content was retrievable at an immutable GitHub commit; it does not prove website ownership, wallet-to-GitHub identity, subjective reliance, or a real-world physical action.
+This proves only that the quoted public content was retrievable at an immutable GitHub commit. It does not prove source ownership, wallet-to-GitHub identity, subjective reliance, chronology, completion of an off-chain act or legal liability.
 
-## Finalized CourseLock lifecycle receipts
+## Fully captured hardened lifecycle — Course 3
 
-All critical receipts below were later read back as `FINALIZED`. Transaction status `FINALIZED` means the chain reached its decided terminal state; contract-level negative cases can still have a finalized transaction whose execution result is an error/rollback.
+Promisor: `party_a`, `0xac3ac69dc0bde389256dd6748c75817ead9286d9`.
 
-### Course 1 — contradictory position blocked
+Counterparty: `party_b`, `0xa7eeae0e93793e3146cb14b0700251b8b0ebadfb`.
 
-| Step | Result |
+All transactions in this table were read back as `FINALIZED` with `MAJORITY_AGREE`, unless a contract-level error is explicitly stated.
+
+| Step | Transaction and finalized readback |
 |---|---|
-| `open_course` | tx `0x45cb90957e1c874346fc45a9b04d579789095f1a4937f1543ddb710c5fbf9b79`; readback course `1`, status `OFFERED`, frozen course hash `1ed2d500b3ce8a65398b6e88909b60d778830bca2257acceba58a04825291d7f` |
-| Unauthorized promisor acceptance | tx `0x786cb3919a021e59046e8d2334cf5879697296d32a46500bf0080a47a38ad85d`; finalized contract error |
-| Counterparty acceptance | tx `0xd697291c4ec328945cfe7f85e660daa8f442d788297fb7276217772acfe1ad00`; readback status `ACTIVE` |
-| Duplicate acceptance | tx `0x137d08d38ca8521a96e1f89b02b4ead2bb3e816e8eed6d5ec64c1d8533fc78fd`; finalized contract error |
-| Unauthorized representation | tx `0x55ff4dc0cd929744ecace0a73ab5cb5eb07ac8258ba4c3b372b7485cad7d2dfa`; finalized contract error |
-| Representation | tx `0x438bf716ee565a95adb151a0390853393b0f43ca6b5a2945fa28fdaa21cc5328`; representation hash `7dd5283a628783d692f5f5b3503120574cac5df76cbc314a1c43ea0710e6c154` |
-| Stale reliance hash | tx `0x43e1fb100f6dcc69b3a6583e113d62a9b5791373358af9c5c4bc5868e7e188b6`; finalized contract error |
-| Reliance commitment | tx `0x87a7d339aaab1c75fe4ba5340533a9d5e0f9eaecd79e2e2ec31e9e6bf4ec89d7`; commitment hash `04c46a1354ebb48049f4733b5029205609aad41abc843338295af4fc0d7a0896` |
-| Stale position binding | tx `0x78ae4f2dcd9625e9bea0ae6d962ad39488ee6dedbaade7cc7d33e9b23e4b56d3`; finalized contract error |
-| Evidence consensus | tx `0x721316dd63f5fe9ef070a666965cebca5a24ed0aca1580620189a9693348be8e`; readback `CONFIRMED`, reason `VERBATIM_MATCH_CONFIRMED`, evidence hash `9d1df2f4e0224eb589aed56caefc2936e9ee4054750f27ea5e6e3b7736592e43` |
-| Contradictory position | tx `0x4f24fec5c34f99fb7dd63e272e3e654659dd7481f2649ad30ebc339f2355228b`; position hash `eb8978b070b534abc7c2d646f530d592a7fe9d1d3e814524c9902cc29c84ca7b` |
-| Assessment | tx `0xb46e488e425a0934059f9585b2987828fc114eb95a9a14a6dc0feb19cefecd74`; readback `BLOCKED`, relation `CONTRADICTORY`, `same_action=true`, `reverses_treatment=true`, witness `DIRECT_NEGATION_SAME_ACTION` |
-| Consumer gate | `is_protected(1) == true`; `can_enforce(1, ...) == false` |
+| Course creation | `0x27bb1ecf0f6c8337ef7abd00bc7e5629b746fd58eccf51c54dc6125d1ae98fe4`; course `3`, course hash `270ddb947e63d7ebb7f3094d0de9f81d397b5d69b7ff37409729819163330e40` |
+| Counterparty acceptance | `0x042081bb3e0c1ab43065ec3fb989c0da8563696c0918c7c807ecce3b0f56194b`; readback `ACTIVE` |
+| Representation registration | `0xdcf988206516dfaf27b438923aed6209c3c237a673412ddeeb21444d248f6fe0`; representation `2`, hash `2e83bcb17cd46d97eb86877eaf51e2c6602a2028b9ab7862b8d9424878755a6a` |
+| Reliance commitment | `0xd1780cc24aa5fe969d5b883cd76176d896f16df5e80dc56d50c7c6e6f093233d`; reliance `2`, commitment hash `4d9803420cd72616e4af968b3e533fe174f3a4d72e442be9406b48edb6dc73b4` |
+| Evidence verification | `0x8b54f31eaa0856e04074174faf37576c6c3aa4f72b1518edc3c1a236e2b65737`; readback `CONFIRMED`, proof reason `VERBATIM_QUOTE_PRESENT_IN_CONTEXT_CONFIRMING_ACTION`, evidence hash `7462d8f39d3af499b20f6d8aa71a8aa8657a70049d26cceb269c0147dc41d2fe` |
+| Contradictory position | `0x09c45b894b7014336ab802360a34d4ab31428f0f24a75432a46ff7d9149c6911`; attempt `5`, position hash `aaf2f9421bd2feae5f8d2bc69470b5807072e83e6e74652f81f0dbb252a720fc` |
+| Contradiction assessment | `0xbe5caca2b5ac329f06c9b5fefe6d4d195d2483fa5874276a2edf6c76d91d3bc0`; readback `BLOCKED`, relation `CONTRADICTORY`, `same_action=true`, `reverses_treatment=true` |
+| Consistent position | `0xc11bacffbc8113a42b3cfe6943a98c8a8b2431bad7ec15995c5d15c17936ef6b`; attempt `6`, position hash `fa6addfd498381ee30cee1d35ef50bf6d917443800ee85f1543cf0f269d93fd1` |
+| Consistency assessment | `0xd574f5d08a8f256e2b5fd6a12dd8a5bef5c009b7942eed75ac5d6425d8510bfa`; readback `CLEARED`, relation `CONSISTENT`, `same_action=true`, `reverses_treatment=false` |
+| Exact clearance view | `can_enforce(6, 2e83…5a6a, 4d98…73b4, fa6a…3fd1) == true` |
+| Stale binding rejection | `0xba8229f12752cd38b40da1df4b092c92683565a41d4c21d466e936a76588675d`; finalized contract error `STALE_BINDING` |
 
-### Course 2 — consistent position cleared and ambiguity denied
+## Historical protection, ambiguity and closure — Course 1
 
-| Step | Result |
-|---|---|
-| Course/acceptance | open tx `0xac980e593aa9928705ed64cf1353b8ba5e1b71f8f6f2a0ae8f94c323a990fd43`; accept tx `0xe1b5be809b8c8e4f3ce6a0c1f95f29325f0ea34cf420071a96cd4f20a37e7924` |
-| Representation | tx `0xfcc417e238737fc9c9c029cc87bee16e7128f7667d66585de1220ad7319db49b`; hash `23fdb6efd347f14794cf617b2e0c411b1d708d885e367fb6db5925d5229bab7c` |
-| Reliance | tx `0x473061deba3bf3e940abddd7e275063f9ca1f555a9799c7ee77844521b3c1de2`; commitment hash `8e01875fe5f6c4061e6119518ec890188e023382133cfc72f44e39c66e31de87` |
-| Evidence | tx `0x96d783e6e56a1545c54cf68f7d3ab4d6301c557b5b901330f3f5f0cdbd765529`; readback `CONFIRMED`, evidence hash `2f79b95a2d421842615a578eba47d9ffe8daa429c487bdd1942396dbd264eda7` |
-| Consistent position/assessment | open tx `0x2fc361fdab3c5b1ab4ece6a2b64122baabe9b7b27329eb8366b1231744e16a99`; assess tx `0xd43e07d834d323360c38fa2e6764a9f18c02f5f2169ff3d4d75e343e2142c4bc` |
-| Cleared readback | attempt `2`, status `CLEARED`, relation `CONSISTENT`, `same_action=true`, `reverses_treatment=false`, position hash `c075ef4bdc0fc083b98c1ba75d73ec960595eeb55879f19cdde3dfdaec25528d`; `can_enforce(...) == true` |
-| Ambiguous position | open tx `0x9bb263389b622a437563f248b6b2f96beac046188992a601a067af153a0a8343`; assess tx `0x9686d5e63444b49d640ac45b12c6463057f1c503571d2607f30589f6bc653c64` finalized `UNDETERMINED` / `MAJORITY_DISAGREE`; attempt remains `OPEN`, and `can_enforce(...) == false` |
+Course 1 was used as the retained-history and consumer fixture. The final readbacks were: representation `1` hash `9f37fcfe63c9c2799d21dd3cad3d6afca49976cb6f4f676dffa7c705d307c059`; reliance `1` commitment `3b8d7525951c38c4fc7fd0bc7e02f95a4b0bee471f152803bbb886860be41061`; confirmed evidence hash `12c7044961aa04af52d4ad3cb18abd3efad4f34d6b263202f5c5b7e2e42485a8`.
 
-### Course 3 — withdrawal and closure preserve history
-
-- Reliance was committed in tx `0x65923ee1fb7aff17f89a73e308cc4462b1fb9fc6928a2f00f899e442027cd4c2` with commitment hash `e4ec8af0071fd79bab71ab1d1fab6ab53601dc5098a6f7fb030be5b402733088`.
-- Withdrawal tx: `0xfbf06bb25815e56dd117edc397a2da9772164b87a8e8fb04d09f262d0f4e0945`.
-- New reliance after withdrawal tx `0xcf0bea4b0d7547abbd4f0cbc3ed2193cb19222dba66a1d23656882d554e59ea6` finalized with a contract error.
-- The previously recorded reliance remained readable. An invalid quote was stored as `proof_status=REJECTED`, `proof_reason=QUOTE_ABSENT`, tx `0x9bd6208366258237cc1e17397af3b43901f02d310824dc97d8cb6080d2c09b26`.
-- Closure tx: `0x81435898bc14e7e2d0b22aa3a38b8fb82842d4137a5dc561a27e305823853eac`; readback course status `CLOSED`.
-- New representation after closure tx `0x78acf89cea56a745d9d15d1f04104d00aa77c665503128208b285dc09c08459c` finalized with a contract error.
+- Unauthorized proof attempt: `0xbafe2828ac0747d9330a68d485dd724ed4b0f479c83f649fa7e0369572d68c2f` → finalized `ONLY_RELYING_PARTY`, no proof state change.
+- Valid proof: `0x314ea7ab209bc25fb42feff387f652d3cc4764a67a092a961e147270df2aaeff` → finalized `CONFIRMED`.
+- Unauthorized position attempt: `0xca582d6c724ab9218822c88840dbeaaa8cc10fe95c3255aafa101222ef96d457` → finalized `ONLY_PROMISOR`.
+- Contradictory position/assessment: `0xe874358b984d8e238f6ebc5a6b38192e6bb31640cc8d60e8c2ad037a40313c02` / `0xa471ecd824e8e3ba1baf2b916fa436d90f05795e631ea20db1d21d779836fd1d` → finalized `BLOCKED`; `can_enforce=false`.
+- Consistent position/assessment: `0xd71ac0475c17c6ad1cccd86cdcfa0a778f8e0879ef39a3c3659b5495bb56c862` / `0xbf69916b4059d28ec79eec1e4da0bd130b52e8f9201cbef95fbaba5fd1e06611` → finalized `CLEARED`; exact `can_enforce=true` for attempt `2`.
+- Non-decisive position assessment: `0xbda9343457b79dabee15a8d8800e70b62fea6652f17f8c112f346fefb2f51ee0` → finalized `UNDETERMINED / MAJORITY_DISAGREE`; attempt `4` remained `OPEN`; `can_enforce=false`.
+- Withdrawal: `0xb75ac68187602d10f95a3e9893823cd02cbf050fb5507682d40bdd4a13a3bac4` → finalized; representation readback `WITHDRAWN`, prior reliance still `CONFIRMED`.
+- New reliance after withdrawal: `0xdc50106533b948cbf6642aace9118444eb46d431eb2b0d145a576718518ff455` → finalized `RELIANCE_WINDOW_CLOSED`.
+- Closure: `0xc3fedb6b35656ec24d2c55e6df7a37e2aec81d83ff8ee946b21bae3519ff7f0e` → finalized; course readback `CLOSED`.
+- New representation after closure: `0xd1760eb973e71419d082c7beb6b5bd322435d909671b8219e7837dd6c4e8b3d4` → finalized `COURSE_NOT_ACTIVE`.
 
 ## Cross-contract consumer proofs
 
-The consumer deployment and all four execution receipts below were later read back as `FINALIZED` / `MAJORITY_AGREE`.
+The consumer executor is `0x0d5540e0ad4b92aa0ad4e5f1b8cd645ee1e363e7`.
 
-- Blocked CourseLock attempt: tx `0x266798a07a37c4c49e5dcdfeea65437ce532a1aa24f88f651441192f325026a8`; rollback `NO_COURSELOCK_CLEARANCE`; count remained `0`.
-- Unauthorized counterparty wallet: tx `0x1d1201a1e559dfab46dc636c702d2b8bcd3b2efea84925ac0691ec0348285cc8`; rollback `ONLY_EXECUTOR`.
-- Cleared CourseLock attempt: tx `0x92fd3e68174d02d83e5878fc4e2b466af0cb3df9c1520f808a3d41625ff606c9`; execution `SUCCESS`; count became `1`.
-- Exact replay: tx `0x711d901477fdebc417ccebf82b08f869341a7f7f11917aac433d4650b2099d41`; rollback `ACTION_ALREADY_EXECUTED`; count remained `1`, `was_executed(64-hex-action-id) == true`.
+- Blocked CourseLock attempt: `0xe699f9e80d4f183deedbc92686919ba8970db48bd0124d80097ad151ba06b574` → finalized `NO_COURSELOCK_CLEARANCE`; count remained `0`.
+- Cleared intent commit: `0xea68c70bba8cf42659195fb289adc3ea0b76d0441f0d4ac9bf019180ee45e0af` → finalized; payload hash `192e7eeae9bb8a0db5df80d3f34ddc7536fa24d24660364c37d781be132923e0`.
+- Exact cleared execution: `0xfc5519ff9187094e285ac0d081f388efe958b27f00ab6bc42a3a1ca060476cf3` → finalized success; count became `1`.
+- Exact replay: `0xaf9b5984bfd58f8fbbe5248955fc47dfd38031c00d2df5fa86e600b2d7ccbeea` → finalized `ACTION_ALREADY_EXECUTED`; count stayed `1`.
+- Payload substitution: `0x49b41b76f71d8b638a32ee4e42709fbc98f43ef2d5781408bdef8346c736ad4f` → finalized `PAYLOAD_BINDING_MISMATCH`.
+- Unauthorized wallet: `0x17510b96f9bc1e90b1c6cd5556acc1b985fd6addacfa38e65e6e1a086b8f0764` → finalized `ONLY_EXECUTOR`.
 
-## Reproduction commands
+## Baseline preservation
 
-```sh
-npm ci
-python -m pip install -r requirements-dev.txt
-python -m pytest tests -q
-python scripts/preflight.py
-node scripts/assert_studionet.mjs
-node scripts/deploy_studionet.mjs
-```
+The baseline commit was `251ff349e4c8ed1c73dc573e5074de88dafa5c3f`. Its pre-hardening source hashes were:
 
-The primary guard requires `DEPLOY-61999`. Do not print or commit wallet secrets. The live lifecycle was run with the local `genlayer-js` package bundled by the pinned CLI so that typed `Address` constructor and cross-contract arguments could be verified without exposing a private key.
+| Source | Baseline SHA-256 |
+|---|---|
+| `contracts/courselock.py` | `c5d06e1de41d0fc7a0982575f66fe293151b8afd90078550e2da9cfe0b1b537a` |
+| `contracts/course_consumer.py` | `62ffdf651e1e5bd6b0808776e6c0afab3cc4c23424877e56a646988d5e428257` |
+
+The baseline deployment at `0xc0c6016b1Ef9Dc9D4bEC33D651Eb5F6Eb91B8167` and baseline consumer at `0xaa8a5Cd74f6A0f82A4413AF0a8ce71Bb09DcbF90` remain historical only. They are not presented as deployments of the hardened source.

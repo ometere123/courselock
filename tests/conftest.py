@@ -26,7 +26,10 @@ class FakeMap(dict):
     def __class_getitem__(cls, args): return cls
     def get_or_insert_default(self, key):
         if key not in self:
-            self[key] = types.SimpleNamespace(representations=[],reliances=[],attempts=[])
+            self[key] = types.SimpleNamespace(
+                representations=[], reliances=[], attempts=[],
+                proof_history=[], assessment_history=[],
+            )
         return self[key]
 
 class FakeList(list):

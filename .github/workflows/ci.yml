@@ -14,7 +14,10 @@ jobs:
       - run: python -m pip install -r requirements-dev.txt
       - run: python -m pytest tests -q
       - run: python scripts/preflight.py
+      - run: python scripts/source_consistency.py
       - run: python -m py_compile contracts/courselock.py contracts/course_consumer.py
+      - name: GenLayer Direct Mode contract tests
+        run: gltest direct_tests -v -s
       - name: GenVM lint and runtime validation
         env:
           GENVM_VERSION: v0.3.0-rc7
@@ -27,4 +30,8 @@ jobs:
           node-version: '22'
       - run: npm ci
       - run: test "$(./node_modules/.bin/genlayer --version)" = "0.39.1"
+      - name: Production dependency audit
+        run: npm audit --omit=dev --audit-level=high
+      - name: Source hash manifest
+        run: python scripts/hash_manifest.py
       - run: node --check scripts/deploy_studionet.mjs && node --check scripts/assert_studionet.mjs

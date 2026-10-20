@@ -1,30 +1,50 @@
-# Evidence ladder and completion criteria
+# CourseLock test plan and results
 
-## Verified in this generation environment
+The repository distinguishes the deterministic offline fake runtime, GenVM Direct Mode, and live StudioNet. A green local mock test is never presented as a live consensus result.
 
-- `python -m pytest tests -q`: 32 passed offline mock-runtime tests.
-- `python scripts/preflight.py`: 16 structural checks passed.
-- `python -m py_compile contracts/*.py` and `node --check`: syntax passed.
+## Final local commands and results
 
-**What this is NOT**: GenVM Direct Mode, live web consensus, a production build, a source-matched chain deployment, or proof the optional consumer is deployed.
+| Check | Exact command/result |
+|---|---|
+| Offline tests | `python -m pytest tests -q` → **32 passed** |
+| Structural checks | `python scripts/preflight.py` → **16 checks passed** |
+| Python syntax | `python -m py_compile contracts/courselock.py contracts/course_consumer.py` → pass |
+| JavaScript syntax | `node --check scripts/deploy_studionet.mjs` and `node --check scripts/assert_studionet.mjs` → pass |
+| Direct Mode dependencies | `genlayer-test==0.29.0`, `genlayer-py==0.11.0`, `pytest==8.4.2` |
+| Direct Mode | Windows equivalent full-path command `& '...\\gltest.exe' direct_tests -q -s --tb=short` → **26 passed** |
+| GenVM linter | `genvm-linter==0.11.0`, `GENVM_VERSION=v0.3.0-rc7 genvm-lint check ... --json` → primary and consumer validation pass; only informational `I200` |
+| Stable network guard | `node scripts/assert_studionet.mjs` → `eth_chainId=0xf22f`, decimal `61999` |
+| Local CLI | repository-local `genlayer --version` → `0.39.1` |
 
-## Mandatory Codex Direct Mode work before submission
+The Direct Mode suite contains 26 meaningful tests rather than 60 duplicated functions. It covers typed/nonzero address conversion, course ownership/acceptance, duplicate and unauthorized calls, stale hashes, withdrawal/closure history, URL namespace hardening, evidence shape/quote failures, proof and position fail-closed behavior, malicious-result cases, consumer hash/executor/replay checks, and the status dictionary. Direct Mode uses the local test harness; it is not a StudioNet transaction.
 
-1. Install `genlayer-test==0.29.0` and correct stable GenVM test SDK; run and expand `direct_tests/test_courselock_direct.py` to **full dual-account coverage**.
-2. Test actual sender switching with an A promisor, B counterparty, and C unauthorised outsider; confirm representation can't be spoofed and B must explicitly accept.
-3. Independently mock source fetch in leader/validator; verify exact-quote absence, misleading context, instruction injection, page unavailability, changed source content, HTTP failure, source namespace escape, oversized page, invalid JSON and truncated output.
-4. Independently mock contradictory/consistent/unrelated/ambiguous conclusions; validator must substantively disagree with malicious leader when warranted; positive contradiction must survive adversarial compatible-reading check.
-5. Verify withdrawal/closure affects only *future* reliance; frozen existing reliance/attempts remain readable and settleable.
-6. Verify stale representation/commitment/evidence/position hashes cannot provide clearance, consumer read binds all exact values, and replayed consumer action ID is refused.
-7. Validate both primary/consumer contracts' ABI and storage serialization on actual GenVM; fix `Address`, TreeMap, typed interface or event inconsistencies if any.
-8. Run `gltest direct_tests -v -s` until entirely passing with screenshots/logs, and update this document with a source-matched test report. Do not mark unrun tests passing.
+## Live StudioNet coverage
 
-## Mandatory StudioNet 61999 finalization
+The finalized run used distinct wallet identities:
 
-1. `npm install`, verify repo-local CLI `0.39.1`, verify RPC `eth_chainId=0xf22f` (61999 decimal), select `studionet` exactly.
-2. Deploy the exact primary source, record tx/hash/address, await **finalization**, verify explorer source parity and contract schema.
-3. Deploy optional consumer with the finalized CourseLock address and verify typed read.
-4. Run source-matched lifecycle with two distinct wallets/identities: consent, publish, reliance, valid proof and three new positions (contradictory, consistent, ambiguous). Record both positive and negative case receipts.
-5. Verify `CourseConsumer` refuses BLOCKED/UNRESOLVED and accepts CLEARED once. Read back `get_count()==1` and reject duplicate action.
-6. Include raw command outputs, transaction hashes, finality, code hash and source hashes in `DEPLOYMENT.md`; verify **61999** in every run.
-7. Run repository tests/CI successfully after any changes; no unresolved TODOs/failed tests at submission.
+- Promisor: `praest-deployer`, `0x0d5540e0aD4B92Aa0ad4e5F1b8cD645ee1E363E7`
+- Counterparty: `party_b`, `0xA7EeAE0E93793e3146Cb14b0700251B8b0EBADFB`
+
+The live run covered:
+
+- course creation, explicit acceptance, duplicate acceptance, and unauthorized acceptance;
+- promisor-only representation publication and unauthorized representation attempt;
+- correct and stale reliance commitments;
+- confirmed public quote fetched from an immutable GitHub raw URL;
+- stale position binding;
+- genuine contradiction → `BLOCKED`, `is_protected=true`, `can_enforce=false`;
+- genuine compatibility → `CLEARED`, exact `can_enforce=true`;
+- ambiguous assessment finalized as `UNDETERMINED/MAJORITY_DISAGREE`, leaving the attempt `OPEN` and `can_enforce=false`;
+- representation withdrawal rejecting new reliance while preserving earlier history;
+- invalid quote → `REJECTED/QUOTE_ABSENT` and course closure rejecting new representation;
+- typed CourseConsumer cross-contract block, executor rejection, successful clear, and replay rejection.
+
+The live evidence table and every critical receipt hash are in [DEPLOYMENT.md](../DEPLOYMENT.md).
+
+## Adversarial cases and limits
+
+The deterministic and Direct Mode tests inject malformed JSON, truncated results, prompt-injection strings, missing quotes, changed/misleading context, namespace confusion, wrong hashes, and malicious leader classifications. The leader and validator callbacks are both exercised by the test fixtures, including disagreement rejection and compatible-reading rejection.
+
+StudioNet cannot safely be used as a deterministic unit-test fixture for arbitrary hostile web pages or validator scheduling. The live run therefore validates the real public evidence, two independent consensus boundaries, and final state readbacks; the broader hostile web matrix remains a reproducible Direct Mode regression suite.
+
+No test asserts subjective reliance, wallet-to-website identity, website ownership, or legal liability. Those are documented trust limits, not hidden protocol guarantees.

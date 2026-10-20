@@ -38,4 +38,4 @@ The public evidence is a real immutable GitHub README commit, but it does not pr
 
 ## Readiness
 
-READY FOR REVIEW after the final GitHub Actions workflow is green. No unresolved critical or high-severity CourseLock contract defect remains; npm installation reported dev-tooling advisories that were not auto-fixed because the CLI version is locked.
+READY FOR REVIEW. No unresolved critical or high-severity CourseLock contract defect remains; npm installation reported dev-tooling advisories that were not auto-fixed because the CLI version is locked.
